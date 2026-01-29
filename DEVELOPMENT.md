@@ -1,12 +1,7 @@
 # 开发与架构深度文档 (Development & Architecture)
 
 ## 1. 软件需求规格 (SRS)
-- **输入支持**：复杂布局 PDF（含多级标题、表格、扫描件）。
-- **处理性能**：单页 OCR + LLM 修复需在 10s 内完成；向量召回需在 1s 内响应（5k 块规模）。
-- **核心组件**：
-  - PDF 结构化解析引擎。
-  - 基于 BGE-M3 的向量化中间件。
-  - RAG 全链路调试 GUI（支持模型切换、Top-K 调节）。
+*详细内容请参阅独立文档：[SRS.md](./SRS.md)*
 
 ## 2. 架构设计 (Google 工程师视角)
 
@@ -57,38 +52,11 @@ CREATE TABLE chunks_full_index (
 );
 ```
 
-## 5. 函数调用关系图 (Mermaid)
+## 5. 可视化架构与流程图
+*更多流程图、时序图及拓扑图请参阅：[DIAGRAMS.md](./DIAGRAMS.md)*
 
-```mermaid
-graph TD
-    A[RAG_lightQueryFront.py] -->|1. Rewrite| B(Local LLM)
-    A -->|2. Embedding| C(BGE-M3 API)
-    C -->|3. Search| D[(SQLite DB)]
-    D -->|4. Top-20 Candidates| E[BGE Reranker]
-    E -->|5. Context| F(Generation LLM)
-    F -->|6. Final Answer| A
-```
-
-## 6. 脑图 (Mind Map - Mermaid)
-
-```mermaid
-mindmap
-  root((RAG系统))
-    数据解析
-      OCR引擎
-      布局分析
-      LLM文本修复
-    知识加工
-      结构感知切片
-      上下文注入
-    索引检索
-      BGE-M3向量化
-      多路召回
-      Rerank精排
-    应用层
-      Query重写
-      动态UI交互
-```
+## 6. 代码组织与模块职责
+*详细的文件级说明请参阅：[CODE_STRUCTURE.md](./CODE_STRUCTURE.md)*
 
 ## 7. 安全性分析
 1. **API 安全**：当前 API Key 采用硬编码方式，存在泄露风险。*改进建议：迁移至 `.env` 文件。*

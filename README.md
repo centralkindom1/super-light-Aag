@@ -38,5 +38,10 @@
 - **粒子动态 UI**：极简且具科技感的交互界面。
 
 ---
-*更多技术细节请参阅 [DEVELOPMENT.md](./DEVELOPMENT.md)*
-*使用说明请参阅 [USER_GUIDE.md](./USER_GUIDE.md)*
+## 📚 导航文档库
+- **产品白皮书**: [PRODUCT.md](./PRODUCT.md) - 核心价值与市场定位。
+- **软件需求规格**: [SRS.md](./SRS.md) - 功能与非功能需求详情。
+- **开发架构文档**: [DEVELOPMENT.md](./DEVELOPMENT.md) - 深入了解系统设计。
+- **代码结构指南**: [CODE_STRUCTURE.md](./CODE_STRUCTURE.md) - 模块化设计与代码地图。
+- **可视化流程图**: [DIAGRAMS.md](./DIAGRAMS.md) - 系统架构与时序图。
+- **用户使用手册**: [USER_GUIDE.md](./USER_GUIDE.md) - 快速上手指南。
