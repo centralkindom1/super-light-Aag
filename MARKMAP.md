@@ -1,0 +1,25 @@
+# 项目思维导图 (Markmap)
+
+- 视觉语义 RAG 系统
+  - 数据处理层
+    - PDF 解析 (pdfplumber)
+    - OCR 识别 (Tesseract)
+    - 图像预处理 (OpenCV)
+    - LLM 语义修复 (DeepSeek)
+  - 知识建模层
+    - 结构感知切片
+    - 章节路径注入 (H1 > H2)
+    - 滑动窗口算法
+  - 检索引擎层
+    - BGE-M3 向量嵌入
+    - SQLite 持久化存储
+    - 多路召回 (向量 + 重排)
+    - Query 重写逻辑
+  - 交互表示层
+    - PyQt5 解析控制台
+    - Tkinter 粒子效果问答台
+    - 全链路交互日志
+  - 工程优化
+    - 环境依赖管理 (requirements.txt)
+    - 多线程并发处理
+    - 安全性与扩展性建议

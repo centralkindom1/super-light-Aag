@@ -1,0 +1,10 @@
+pdfplumber
+pytesseract
+requests
+opencv-python
+numpy
+Pillow
+PyQt5
+python-docx
+pandas
+urllib3
