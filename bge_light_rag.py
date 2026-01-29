@@ -27,14 +27,14 @@ class RagConfig:
 
     PROVIDERS = {
         'intranet': {
-            'url': "https://aiplus.airchina.com.cn:18080/v1/embeddings",
-            'key': "sk-fXM4W0CdcKnNp3NVDfF85f2b90284b11AfDdF9F5627f627b",
+            'url': "https://www.siconvaly.com:18080/v1/embeddings",
+            'key': "your api key",
             'model': "bge-m3",
             'name': "内网 BGE-M3"
         },
         'silicon': {
             'url': "https://api.siliconflow.cn/v1/embeddings",
-            'key': "sk-udyhequsmccvaccqywfmkksezoeuvfvgbmtpudhzbrdeexac",
+            'key': "your api key",
             'model': "BAAI/bge-m3",
             'name': "硅基流动 BGE-M3"
         }
@@ -353,4 +353,5 @@ class RagApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = RagApp(root)
+
     root.mainloop()
