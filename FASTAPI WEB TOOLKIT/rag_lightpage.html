@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Light RAG - Web Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { background-color: #1a1a1a; color: #e5e5e5; font-family: 'Segoe UI', sans-serif; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+        .log-box { font-family: 'Consolas', monospace; background: #000; color: #0f0; }
+        .tree-node { padding-left: 20px; border-left: 1px solid #333; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #333; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="app" class="container mx-auto p-4 max-w-6xl">
+        
+        <header class="mb-6 border-b border-gray-700 pb-4">
+            <h1 class="text-2xl font-bold text-blue-400">⚡ RAG 轻量级引擎 Web 版</h1>
+            <p class="text-gray-400 text-sm">Pipeline: PDF Upload -> OCR/LLM -> ETL -> Vector DB -> Chat</p>
+        </header>
+
+        <div class="flex space-x-6 mb-6 text-lg font-medium">
+            <button @click="currentTab = 'ingest'" :class="{'tab-active': currentTab === 'ingest'}" class="pb-2 hover:text-blue-300 transition">
+                🏭 数据生产线 (Data Pipeline)
+            </button>
+            <button @click="switchTab('chat')" :class="{'tab-active': currentTab === 'chat'}" class="pb-2 hover:text-blue-300 transition">
+                💬 智能问答 (RAG Chat)
+            </button>
+        </div>
+
+        <div v-show="currentTab === 'ingest'" class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            <div class="md:col-span-5 space-y-6">
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="font-bold mb-3 text-blue-300">1. 文件来源</h3>
+                    <div class="flex space-x-2">
+                        <input type="file" ref="fileInput" @change="handleFileSelect" class="block w-full text-sm text-gray-400
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-blue-600 file:text-white
+                            hover:file:bg-blue-700"/>
+                    </div>
+                    <div v-if="currentFilename" class="mt-2 text-xs text-green-400">
+                        当前文件: {{ currentFilename }}
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="font-bold mb-3 text-blue-300">2. 执行操作</h3>
+                    <div class="space-y-3">
+                        <button @click="runStep1" :disabled="!currentFilename || loading" 
+                            class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white font-bold flex justify-center items-center">
+                            <span v-if="loading && step===1" class="animate-spin mr-2">⏳</span>
+                            🚀 Step 1: 解析 (OCR + LLM)
+                        </button>
+                        
+                        <button @click="runStep2" :disabled="!step1Done || loading" 
+                            class="w-full py-2 px-4 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white font-bold flex justify-center items-center">
+                            <span v-if="loading && step===2" class="animate-spin mr-2">⏳</span>
+                            💾 Step 2: 向量化入库 (ETL)
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">* Step 1 耗时约 30s/页，Step 2 取决于嵌入模型速度。</p>
+                </div>
+
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700 h-64 flex flex-col">
+                    <h3 class="font-bold mb-2 text-gray-400 text-sm">流水线日志</h3>
+                    <div ref="logBox" class="log-box flex-1 overflow-y-auto p-2 text-xs rounded leading-relaxed">
+                        <div v-for="(log, i) in logs" :key="i">> {{ log }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-7 bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-700 h-[600px] flex flex-col">
+                <h3 class="font-bold mb-3 text-blue-300">解析结构预览 (JSON Tree)</h3>
+                <div class="flex-1 overflow-y-auto bg-gray-900 p-2 rounded border border-gray-700">
+                    <div v-if="previewData.length === 0" class="text-gray-500 text-center mt-10">暂无数据，请运行 Step 1</div>
+                    <div v-for="(item, idx) in previewData" :key="idx" class="mb-2 p-2 rounded bg-gray-800 border-l-4" 
+                        :class="item.role === 'H1' ? 'border-blue-500' : (item.role === 'H2' ? 'border-green-500' : 'border-gray-600')">
+                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                            <span class="font-bold text-white px-1 rounded" :class="getRoleBadge(item.role)">{{ item.role }}</span>
+                            <span>Page {{ item.page }}</span>
+                        </div>
+                        <div class="text-sm text-gray-300 pl-1">{{ item.text }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'chat'" class="grid grid-cols-1 md:grid-cols-3 gap-6 h-[700px]">
+            <div class="md:col-span-2 flex flex-col bg-gray-800 rounded-lg border border-gray-700 shadow-xl overflow-hidden">
+                <div class="bg-gray-900 p-3 border-b border-gray-700 flex justify-between items-center">
+                    <span class="font-bold text-blue-400">💬 对话窗口</span>
+                    
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-gray-400">选择知识库:</span>
+                        <select v-model="selectedDB" @focus="fetchDBList" class="bg-gray-700 text-white text-xs border border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+                            <option value="" disabled>-- 请选择数据库 --</option>
+                            <option v-for="db in availableDBs" :key="db" :value="db">{{ db }}</option>
+                        </select>
+                        <button @click="fetchDBList" title="刷新列表" class="text-gray-400 hover:text-white">↻</button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chatHistory">
+                    <div v-for="(msg, idx) in chatMessages" :key="idx" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+                        <div class="inline-block p-3 rounded-lg max-w-[80%]" 
+                             :class="msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'">
+                            <div class="text-sm font-bold mb-1 opacity-75">{{ msg.role === 'user' ? '我' : 'AI 助手' }}</div>
+                            <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                        </div>
+                    </div>
+                    <div v-if="chatLoading" class="text-left">
+                        <div class="inline-block p-3 rounded-lg bg-gray-700 text-gray-400 animate-pulse">
+                            正在思考与检索...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-gray-900 border-t border-gray-700 flex space-x-2">
+                    <input v-model="queryInput" @keyup.enter="sendQuery" type="text" placeholder="输入关于文档的问题..." 
+                        class="flex-1 bg-gray-800 border border-gray-600 text-white rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                    <input v-model.number="topK" type="number" min="1" max="20" class="w-16 bg-gray-800 border border-gray-600 text-white rounded px-2 py-2 text-center" title="Top-K">
+                    <button @click="sendQuery" :disabled="chatLoading || !selectedDB" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold disabled:opacity-50 disabled:bg-gray-600">
+                        发送
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col">
+                <h3 class="font-bold mb-3 text-gray-400 text-sm">🔎 后台思维链 (Logs)</h3>
+                <textarea readonly class="flex-1 w-full bg-black text-green-500 font-mono text-xs p-2 rounded resize-none focus:outline-none" v-model="debugLog"></textarea>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const currentTab = ref('ingest');
+                const currentFilename = ref('');
+                const loading = ref(false);
+                const step = ref(0);
+                const step1Done = ref(false);
+                const dbReady = ref(false);
+                const logs = ref([]);
+                const previewData = ref([]);
+                
+                // Chat refs
+                const chatMessages = ref([
+                    { role: 'ai', content: '您好！请选择右上角的“知识库”开始提问，或者在“数据生产线”生成新的知识库。' }
+                ]);
+                const queryInput = ref('');
+                const topK = ref(5);
+                const chatLoading = ref(false);
+                const debugLog = ref('');
+                
+                // DB Selection Refs
+                const availableDBs = ref([]);
+                const selectedDB = ref('');
+
+                // Methods
+                const log = (msg) => {
+                    const ts = new Date().toLocaleTimeString();
+                    logs.value.push(`[${ts}] ${msg}`);
+                };
+
+                // 获取 DB 列表
+                const fetchDBList = async () => {
+                    try {
+                        const res = await fetch('/api/rag/list_dbs');
+                        const data = await res.json();
+                        if (res.ok) {
+                            availableDBs.value = data.dbs;
+                            // 如果当前没有选中，且有列表，默认选中第一个? 或者保持空
+                            // if (!selectedDB.value && availableDBs.value.length > 0) {
+                            //    selectedDB.value = availableDBs.value[0];
+                            // }
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch DB list", e);
+                    }
+                };
+
+                const switchTab = (tab) => {
+                    currentTab.value = tab;
+                    if (tab === 'chat') {
+                        fetchDBList();
+                    }
+                };
+
+                const handleFileSelect = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    loading.value = true;
+                    log(`正在上传: ${file.name}...`);
+
+                    try {
+                        const res = await fetch('/api/rag/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            currentFilename.value = data.filename;
+                            log('✅ 上传成功。文件链已建立。');
+                        } else {
+                            log('❌ 上传失败: ' + data.detail);
+                        }
+                    } catch (e) {
+                        log('❌ 网络错误: ' + e.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const runStep1 = async () => {
+                    if (!currentFilename.value) return;
+                    loading.value = true;
+                    step.value = 1;
+                    log('🚀 启动 Step 1 (解析)... 请耐心等待');
+                    previewData.value = [];
+
+                    try {
+                        const res = await fetch('/api/rag/run_step1', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ filename: currentFilename.value })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            log(`✅ Step 1 完成! 解析了 ${data.data.length} 行数据。`);
+                            previewData.value = data.data;
+                            step1Done.value = true;
+                        } else {
+                            log('❌ Step 1 失败: ' + data.detail);
+                        }
+                    } catch (e) {
+                        log('❌ 请求错误: ' + e.message);
+                    } finally {
+                        loading.value = false;
+                        step.value = 0;
+                    }
+                };
+
+                const runStep2 = async () => {
+                    if (!currentFilename.value) return;
+                    loading.value = true;
+                    step.value = 2;
+                    log('💾 启动 Step 2 (ETL & Vectorize)... 这可能需要一点时间');
+
+                    try {
+                        const res = await fetch('/api/rag/run_step2', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ filename: currentFilename.value })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            log(`🎉 Step 2 完成! 共生成 ${data.chunk_count} 个向量块。`);
+                            log(`数据库已就绪: ${data.db_path}`);
+                            dbReady.value = true;
+                            
+                            // 生产完成后，自动刷新列表并选中当前新生成的DB
+                            await fetchDBList();
+                            const expectedDBName = currentFilename.value.split('.')[0] + "_day1_export_vector_ready_rag_production.db";
+                            // 简单的匹配尝试
+                            const match = availableDBs.value.find(db => db.includes(expectedDBName) || db.includes(currentFilename.value.split('.')[0]));
+                            if (match) selectedDB.value = match;
+
+                            alert("生产线全部完成！已自动为您选中新生成的知识库，请切换到 '智能问答' 标签页进行提问。");
+                        } else {
+                            log('❌ Step 2 失败: ' + data.detail);
+                        }
+                    } catch (e) {
+                        log('❌ 请求错误: ' + e.message);
+                    } finally {
+                        loading.value = false;
+                        step.value = 0;
+                    }
+                };
+
+                const sendQuery = async () => {
+                    if (!queryInput.value.trim() || !selectedDB.value) {
+                        alert("请输入问题并确保已选择一个知识库！");
+                        return;
+                    }
+                    
+                    const q = queryInput.value;
+                    chatMessages.value.push({ role: 'user', content: q });
+                    queryInput.value = '';
+                    chatLoading.value = true;
+                    debugLog.value = "正在请求 RAG 引擎...\n";
+
+                    try {
+                        const res = await fetch('/api/rag/query', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ 
+                                filename: currentFilename.value || "manual_select", // 兼容旧字段，但主要靠 db_selection
+                                db_selection: selectedDB.value,
+                                query: q,
+                                top_k: topK.value
+                            })
+                        });
+                        const data = await res.json();
+                        
+                        if (res.ok) {
+                            chatMessages.value.push({ role: 'ai', content: data.answer });
+                            debugLog.value = data.logs;
+                        } else {
+                            chatMessages.value.push({ role: 'ai', content: '❌ 错误: ' + data.detail });
+                        }
+                    } catch (e) {
+                        chatMessages.value.push({ role: 'ai', content: '❌ 网络错误: ' + e.message });
+                    } finally {
+                        chatLoading.value = false;
+                    }
+                };
+
+                const getRoleBadge = (role) => {
+                    if (role === 'H1') return 'bg-blue-600';
+                    if (role === 'H2') return 'bg-green-600';
+                    return 'bg-gray-600';
+                };
+                
+                // 初始化加载DB列表
+                onMounted(() => {
+                    fetchDBList();
+                });
+
+                return {
+                    currentTab, currentFilename, loading, logs, previewData, 
+                    step1Done, dbReady, step, switchTab,
+                    handleFileSelect, runStep1, runStep2, getRoleBadge,
+                    chatMessages, queryInput, topK, chatLoading, sendQuery, debugLog,
+                    availableDBs, selectedDB, fetchDBList
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
